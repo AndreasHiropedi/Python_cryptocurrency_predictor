@@ -19,49 +19,57 @@ logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 
 st.write(
     """
-# Cryptocurrency Dashboard Application
-Visually show data on crypto (BTC, ETH and more) from 01/01/2019 to the most recent date
-and predicts data on the cryptocurrencies mentioned above.
+# Cryptocurrency Dashboard
+Visualize data about different cryptocurrencies (BTC, ETH and many more) from 01/01/2019 
+up until today and also show how a simple model's predictions for these cryptocurrencies 
+compare to the real data.
+
+DISCLAIMER: This is for fun and educational purposes only and should not be treated as
+financial advice for trading cryptocurrencies.
 """
 )
 
 image = Image.open("./Dashboard.png")
 st.image(image, use_container_width=True)
 
-st.sidebar.header("User input")
+st.sidebar.header("Select Cryptocurrency")
 
 
 def get_input():
-    crypto_symbol = st.sidebar.text_input("Crypto Symbol", "BTC")
-    return crypto_symbol
+    crypto_options = {
+        "Bitcoin (BTC)": "BTC",
+        "Ethereum (ETH)": "ETH",
+        "Dogecoin (DOGE)": "DOGE",
+        "Solana (SOL)": "SOL",
+        "XRP (XRP)": "XRP",
+        "Bitcoin Cash (BCH)": "BCH",
+        "Stellar (XLM)": "XLM",
+        "Cardano (ADA)": "ADA",
+        "Avalanche (AVAX)": "AVAX",
+        "Chainlink (LINK)": "LINK",
+        "Litecoin (LTC)": "LTC",
+    }
+
+    selected = st.sidebar.selectbox("Cryptocurrency", list(crypto_options.keys()))
+    return crypto_options[selected]
 
 
 def get_crypto_name(symbol):
     symbol = symbol.upper()
-    if symbol == "BTC":
-        return "Bitcoin"
-    elif symbol == "ETH":
-        return "Ethereum"
-    elif symbol == "DOGE":
-        return "Dogecoin"
-    elif symbol == "SOL":
-        return "Solana"
-    elif symbol == "XRP":
-        return "XRP"
-    elif symbol == "BCH":
-        return "Bitcoin Cash"
-    elif symbol == "XLM":
-        return "Stellar"
-    elif symbol == "ADA":
-        return "Cardano"
-    elif symbol == "AVAX":
-        return "Avalanche"
-    elif symbol == "LINK":
-        return "Chainlink"
-    elif symbol == "LTC":
-        return "Litecoin"
-    else:
-        return "None"
+    crypto_names = {
+        "BTC": "Bitcoin",
+        "ETH": "Ethereum",
+        "DOGE": "Dogecoin",
+        "SOL": "Solana",
+        "XRP": "XRP",
+        "BCH": "Bitcoin Cash",
+        "XLM": "Stellar",
+        "ADA": "Cardano",
+        "AVAX": "Avalanche",
+        "LINK": "Chainlink",
+        "LTC": "Litecoin",
+    }
+    return crypto_names.get(symbol, "None")
 
 
 def generate_predictions(data):
@@ -74,7 +82,6 @@ def generate_predictions(data):
     future_data = model.make_future_dataframe(periods=365)
     forecast = model.predict(future_data)
     result = forecast[["ds", "yhat"]].copy()
-    # CONVERT TO STRING IMMEDIATELY TO AVOID ARROW BULLSHIT
     result["ds"] = pd.to_datetime(result["ds"]).dt.strftime("%Y-%m-%d")
     return result
 
@@ -93,17 +100,16 @@ data["Date"] = pd.to_datetime(data["Date"]).dt.tz_localize(None)
 predictions = generate_predictions(data)
 predictions.columns = ["Date", "Predictions"]
 
-# Convert data Date to strings for display and merging
 data_display = data.copy()
 data_display["Date"] = data_display["Date"].dt.strftime("%Y-%m-%d")
 
-# Merge (predictions already has string dates)
 mix = pd.merge(data_display, predictions, how="inner", on="Date")
-combined_data = mix[["Close", "Predictions"]]
+combined_data = mix[["Date", "Close", "Predictions"]].copy()
 
 data_stats = data.drop(columns=["Date"]).describe()
 
-fig = go.Figure(
+# Candlestick chart with dark theme colors
+fig_candle = go.Figure(
     data=[
         go.Candlestick(
             x=data["Date"],
@@ -111,29 +117,139 @@ fig = go.Figure(
             high=data["High"],
             low=data["Low"],
             close=data["Close"],
-            increasing_line_color="green",
-            decreasing_line_color="red",
+            increasing_line_color="#00ff88",  # Bright green
+            decreasing_line_color="#ff4444",  # Bright red
         )
     ]
 )
+fig_candle.update_layout(
+    xaxis_title="Date",
+    yaxis_title="Price (USD)",
+    xaxis_rangeslider_visible=False,
+    plot_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#ffffff"),
+    xaxis=dict(gridcolor="#333333"),
+    yaxis=dict(gridcolor="#333333"),
+)
 
+# Close price chart with neon cyan
+fig_close = go.Figure()
+fig_close.add_trace(
+    go.Scatter(
+        x=data["Date"],
+        y=data["Close"],
+        mode="lines",
+        name="Close Price",
+        line=dict(color="#00d9ff", width=2),  # Neon cyan
+    )
+)
+fig_close.update_layout(
+    xaxis_title="Date",
+    yaxis_title="Price (USD)",
+    hovermode="x unified",
+    plot_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#ffffff"),
+    xaxis=dict(gridcolor="#333333"),
+    yaxis=dict(gridcolor="#333333"),
+)
+
+# Volume chart with purple gradient
+fig_volume = go.Figure()
+fig_volume.add_trace(
+    go.Bar(
+        x=data["Date"],
+        y=data["Volume"],
+        name="Volume",
+        marker_color="#a855f7",  # Purple
+    )
+)
+fig_volume.update_layout(
+    xaxis_title="Date",
+    yaxis_title="Volume",
+    hovermode="x unified",
+    plot_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#ffffff"),
+    xaxis=dict(gridcolor="#333333"),
+    yaxis=dict(gridcolor="#333333"),
+)
+
+# Actual vs Predicted chart with vibrant colors
+fig_predictions = go.Figure()
+
+# Add actual close prices - Neon cyan
+fig_predictions.add_trace(
+    go.Scatter(
+        x=combined_data["Date"],
+        y=combined_data["Close"],
+        mode="lines",
+        name="Actual Close Price",
+        line=dict(color="#00d9ff", width=2.5),  # Neon cyan
+    )
+)
+
+# Add predictions for historical dates - Bright green
+fig_predictions.add_trace(
+    go.Scatter(
+        x=combined_data["Date"],
+        y=combined_data["Predictions"],
+        mode="lines",
+        name="Model Fit",
+        line=dict(color="#1eff00", width=2.5),  # Bright green
+    )
+)
+
+# Add future predictions - Neon orange/yellow
+future_predictions = predictions[~predictions["Date"].isin(data_display["Date"])]
+fig_predictions.add_trace(
+    go.Scatter(
+        x=future_predictions["Date"],
+        y=future_predictions["Predictions"],
+        mode="lines",
+        name="Future Predictions",
+        line=dict(color="#ffaa00", width=2.5),  # Neon orange
+    )
+)
+
+fig_predictions.update_layout(
+    xaxis_title="Date",
+    yaxis_title="Price (USD)",
+    hovermode="x unified",
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1,
+        font=dict(color="#ffffff"),
+    ),
+    plot_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#ffffff"),
+    xaxis=dict(gridcolor="#333333"),
+    yaxis=dict(gridcolor="#333333"),
+)
+
+# Display sections
 st.header(crypto_name + " Data")
-st.write(data_display)
+st.write(data_display.sort_values("Date", ascending=False).reset_index(drop=True))
 
 st.header(crypto_name + " Data Statistics")
 st.write(data_stats)
 
-st.header(crypto_name + " Close Price")
-st.line_chart(data.set_index("Date")["Close"])
+st.header(crypto_name + " Close Price Over Time")
+st.plotly_chart(fig_close, use_container_width=True)
 
-st.header(crypto_name + " Close Price and Predictions")
-st.write(combined_data)
+st.header(crypto_name + " Actual vs Predicted Prices")
+st.plotly_chart(fig_predictions, use_container_width=True)
 
-st.header(crypto_name + " Price Predictions")
-st.write(predictions)
+st.header("Combined Data and Predictions Table")
+st.write(combined_data.sort_values("Date", ascending=False).reset_index(drop=True))
 
-st.header(crypto_name + " Volume")
-st.bar_chart(data.set_index("Date")["Volume"])
+st.header(crypto_name + " Trading Volume")
+st.plotly_chart(fig_volume, use_container_width=True)
 
-st.header(crypto_name + " Candle Stick")
-st.plotly_chart(fig)
+st.header(crypto_name + " Price Movement")
+st.plotly_chart(fig_candle, use_container_width=True)
