@@ -89,7 +89,7 @@ def generate_predictions(data):
 symbol = get_input()
 crypto_name = get_crypto_name(symbol)
 conversion_currency = "USD"
-start = dt.datetime(2019, 1, 1)
+start = dt.datetime(2024, 1, 1)
 end = dt.datetime.now()
 
 ticker = yf.Ticker(f"{symbol}-{conversion_currency}")
