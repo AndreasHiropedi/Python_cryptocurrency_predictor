@@ -2,5 +2,6 @@ pandas==2.3.3
 Pillow==11.3.0
 plotly==6.1.2
 prophet==1.1.7
+cmdstanpy==1.2.4
 streamlit==1.45.1
 yfinance==0.2.66
